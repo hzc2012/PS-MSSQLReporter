@@ -10,7 +10,7 @@ Import-Module ReportHTML -ErrorAction SilentlyContinue
 $ReportTitle = "SQL Server Report"
 $ReportSavePath = "C:\Users\"
 $ReportName = ($(get-date -format "yyyyMMdd")+"MSSQL_Report")
-$RightLogo="https://raw.githubusercontent.com/hzc2012/PS-MSSQLReporter/master/PS-MSSQLReporter.png"
+$RightLogo="https://raw.githubusercontent.com/hzc2012/PS-MSSQLReporter/master/example/PS-MSSQLReporter.png"
 
 (Write-Host -NoNewline "`nInstance: " -ForegroundColor Yellow), (Write-Host $Instance -ForegroundColor White)
 (Write-Host -NoNewline "Report Save Path: " -ForegroundColor Yellow), (Write-Host $ReportSavePath -ForegroundColor White)
