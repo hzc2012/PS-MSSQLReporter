@@ -107,13 +107,17 @@ $Win2 = Get-CimInstance Win32_Operatingsystem
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Domain";'Value' = $Win1.Domain})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Name";'Value' = $Win1.Name})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Manufacturer";'Value' = $Win2.Manufacturer})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "OSName";'Value' = $Win2.Name})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "OSArchitecture";'Value' = $Win2.OSArchitecture})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "NumberOfProcessors";'Value' = $Win1.NumberOfProcessors})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "NumberOfLogicalProcessors";'Value' = $Win1.NumberOfLogicalProcessors})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "TotalVirtualMemorySize";'Value' = ConvertSize($Win2.TotalVirtualMemorySize * 1024)})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "TotalVisibleMemorySize";'Value' = ConvertSize($Win2.TotalVisibleMemorySize * 1024)})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "LastBootUpTime";'Value' = $Win2.LastBootUpTime})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "OS Name";'Value' = $Win2.Name})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Version";'Value' = $Win2.Version})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "System Type";'Value' = $Win1.SystemType})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "OS Architecture";'Value' = $Win2.OSArchitecture})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Number Of Processors";'Value' = $Win1.NumberOfProcessors})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Number Of Logical Processors";'Value' = $Win1.NumberOfLogicalProcessors})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Virtual Memory Size";'Value' = ConvertSize($Win2.TotalVirtualMemorySize * 1024)})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Physical Memory Size";'Value' = ConvertSize($Win2.TotalVisibleMemorySize * 1024)})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Free Virtual Memory";'Value' = ConvertSize($Win2.FreeVirtualMemory * 1024)})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Free Physical Memory";'Value' = ConvertSize($Win2.FreePhysicalMemory * 1024)})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Last BootUp Time";'Value' = $Win2.LastBootUpTime})
 
 
 # Logical Disk Space
@@ -155,7 +159,7 @@ $PieDiskLinks = foreach ($i in 0..($DiskCnt-1))
 
 
 # Logical Disk Space (Failed!!)
-$DiskWarnObj = $DiskObj | Where-Object { $_.FreeSpace / $_.Size -lt 0.1}
+$DiskWarnObj = $DiskObj | Where-Object { $_.FreeSpace / $_.Size -lt 0.5}
 $DiskWarnCnt = $DiskWarnObj.Count
 
 if ( $DiskWarnCnt -gt 0)
@@ -246,6 +250,36 @@ if (($SQLServiceTable).Count -eq 0)
 	}
 	$SQLServiceTable.Add($obj)
 }
+
+
+# Get windows scheduled task
+$OSTaskTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$WinTasks = Get-ScheduledTask
+
+foreach ($WinTask in $WinTasks)
+{
+	$State    = $WinTask.State
+	$TaskPath = $WinTask.TaskPath
+	$TaskName = $WinTask.TaskName
+	
+	$obj = [PSCustomObject]@{
+		'State'    = $State
+		'TaskPath' = $TaskPath
+		'TaskName' = $TaskName
+	}
+	$OSTaskTable.Add($obj)
+}
+
+if (($OSTaskTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No scheduled task were found'
+	}
+	$OSTaskTable.Add($obj)
+}
+
+
+
 
 # SQL Server Configurations
 $SQLConfTable = New-Object 'System.Collections.Generic.List[System.Object]'
@@ -515,7 +549,8 @@ if (($LoginNameTable).Count -eq 0)
 # Jobs base information
 $JobsInfoTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $JobsInfos = ExecuteSQL "select a.name,a.enabled,b.name as owneruser,a.description,a.date_created,a.date_modified,c.next_run_date,c.next_run_time
-from msdb.dbo.sysjobs a with(nolock) left join master.sys.syslogins b with(nolock) on a.owner_sid=b.sid left join msdb.dbo.sysjobschedules c with(nolock) on a.job_id=c.job_id"
+from msdb.dbo.sysjobs a with(nolock) left join master.sys.syslogins b with(nolock) on a.owner_sid=b.sid
+left join msdb.dbo.sysjobschedules c with(nolock) on a.job_id=c.job_id"
 
 foreach ($JobsInfo in $JobsInfos)
 {
@@ -610,9 +645,9 @@ foreach ($BackupInfo in $BackupInfos)
 	
 	$obj = [PSCustomObject]@{
 		'DatabaseName'         = $name
-		'LatestFullBackupTime' = $latest_full_backup_time
-		'LatestDiffBackupTime' = $latest_diff_backup_time
-		'LatestLogBackupTime'  = $latest_log_backup_time
+		'FullBackupTime' = $latest_full_backup_time
+		'DiffBackupTime' = $latest_diff_backup_time
+		'LogBackupTime'  = $latest_log_backup_time
 	}
 	$BackupInfoTable.Add($obj)
 }
@@ -648,7 +683,7 @@ $BackupInfoPie.Add($obj2)
 $PieBackupLinks = Get-HTMLPieChartObject
 $PieBackupLinks.Title = "Database Backup"
 $PieBackupLinks.Size.Height = 300
-$PieBackupLinks.Size.width = 400
+$PieBackupLinks.Size.width = 300
 $PieBackupLinks.ChartStyle.ChartType = 'doughnut'
 $PieBackupLinks.ChartStyle.ColorSchemeName = "ColorScheme4"
 $PieBackupLinks.ChartStyle.ColorSchemeName = "Generated5"
@@ -748,6 +783,214 @@ if (($RestoreTable).Count -eq 0)
 <################################ Mirror ##################################>
 
 <################################ Replication ##################################>
+# Check the current server is distributor or not
+$IsDistributor = ExecuteSQL "SELECT 1 as id FROM master.sys.databases 
+WHERE is_distributor = 1 AND user_access=0 and is_read_only=0 and state=0 AND HAS_DBACCESS(name)=1  AND source_database_id is null"
+
+if ( @($IsDistributor).Count -gt 0 )
+{
+
+# PublisherDB & SubscriberDB
+$PSTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$PSInfos = ExecuteSQL "select distinct s1.name as publisher,p.publication,s.publisher_db,s2.name as subscriber,s.subscriber_db
+,(case when subscription_type=0 then 'Push' when subscription_type=1 then 'Pull' when subscription_type=2 then 'Anonymous' else ''end) subscription_type
+,(case when sync_type=1 then 'Automatic' when sync_type=2 then 'No synchronization' else '' end) sync_type
+,(case when status=0 then 'Inactive' when status=1 then 'Subscribed' when status=2 then 'Active' else '' end) status
+from distribution.dbo.MSpublications p with(nolock)
+inner join distribution.dbo.MSsubscriptions s with(nolock) on p.publication_id=s.publication_id and p.publisher_id=s.publisher_id
+inner join master.sys.servers s1 on p.publisher_id=s1.server_id
+inner join master.sys.servers s2 on s.subscriber_id=s2.server_id"
+
+foreach ($PSInfo in $PSInfos)
+{
+	$publisher = $PSInfo.publisher
+	$publication = $PSInfo.publication
+	$publisher_db  = $PSInfo.publisher_db
+	$subscriber = $PSInfo.subscriber
+	$subscriber_db  = $PSInfo.subscriber_db
+	$subscription_type = $PSInfo.subscription_type
+	$sync_type  = $PSInfo.sync_type
+	$status = $PSInfo.status
+	
+	$obj = [PSCustomObject]@{
+		'publisher'         = $publisher
+		'publication'       = $publication
+		'publisher_db'      = $publisher_db
+		'subscriber'        = $subscriber
+		'subscriber_db'     = $subscriber_db
+		'subscription_type' = $subscription_type
+		'sync_type'         = $sync_type
+		'status'            = $status
+	}
+	$PSTable.Add($obj)
+}
+
+if (($PSTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No publication were found'
+	}
+	$PSTable.Add($obj)
+}
+
+# Snapshot Agent
+$SnapshotTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$SnapshotInfos = ExecuteSQL "select s.name as publisher,publication,publisher_db
+,(case when publication_type=0 then 'Transactional' when publication_type=1 then 'Snapshot' when publication_type=2 then 'Merge' end) publication_type
+,(case when publisher_security_mode=0 then 'SQL Server' when publisher_security_mode=1 then 'Windows' end) publisher_security_mode
+,publisher_login,profile_name,sj.name as job_name,sj.enabled as job_enabled,sj.date_created as job_created,sj.date_modified as job_modified
+from distribution.dbo.MSsnapshot_agents ss
+inner join master.sys.servers s on ss.publisher_id=s.server_id
+left join msdb.dbo.MSagent_profiles ap on ss.profile_id=ap.profile_id
+left join msdb.dbo.sysjobs sj on ss.job_id=sj.job_id"
+
+foreach ($SnapshotInfo in $SnapshotInfos)
+{
+	$publisher = $SnapshotInfo.publisher
+	$publication = $SnapshotInfo.publication
+	$publisher_db  = $SnapshotInfo.publisher_db
+	$publication_type = $SnapshotInfo.publication_type
+	$publisher_security_mode  = $SnapshotInfo.publisher_security_mode
+	$publisher_login = $SnapshotInfo.publisher_login
+	$profile_name  = $SnapshotInfo.profile_name
+	$job_name = $SnapshotInfo.job_name
+	$job_enabled = $SnapshotInfo.job_enabled
+	$job_created  = $SnapshotInfo.job_created
+	$job_modified = $SnapshotInfo.job_modified
+	
+	$obj = [PSCustomObject]@{
+		'publisher'         = $publisher
+		'publication'       = $publication
+		'publisher_db'      = $publisher_db
+		'publication_type'  = $publication_type
+		'publisher_security_mode' = $publisher_security_mode
+		'publisher_login'   = $publisher_login
+		'profile_name'      = $profile_name
+		'job_name'          = $job_name
+		'job_enabled'       = $job_enabled
+		'job_created'       = $job_created
+		'job_modified'      = $job_modified
+	}
+	$SnapshotTable.Add($obj)
+}
+
+if (($SnapshotTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No publication were found'
+	}
+	$SnapshotTable.Add($obj)
+}
+
+# Logreader Agent
+$LogreaderTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$LogreaderInfos = ExecuteSQL "select s.name as publisher,publication,publisher_db
+,(case when publisher_security_mode=0 then 'SQL Server' when publisher_security_mode=1 then 'Windows' end) publisher_security_mode
+,publisher_login,profile_name,sj.name as job_name,sj.enabled as job_enabled,sj.date_created as job_created,sj.date_modified as job_modified
+from distribution.dbo.MSlogreader_agents ss
+inner join master.sys.servers s on ss.publisher_id=s.server_id
+left join msdb.dbo.MSagent_profiles ap on ss.profile_id=ap.profile_id
+left join msdb.dbo.sysjobs sj on ss.job_id=sj.job_id"
+
+foreach ($LogreaderInfo in $LogreaderInfos)
+{
+	$publisher = $LogreaderInfo.publisher
+	$publication = $LogreaderInfo.publication
+	$publisher_db  = $LogreaderInfo.publisher_db
+	$publisher_security_mode  = $LogreaderInfo.publisher_security_mode
+	$publisher_login = $LogreaderInfo.publisher_login
+	$profile_name  = $LogreaderInfo.profile_name
+	$job_name = $LogreaderInfo.job_name
+	$job_enabled = $LogreaderInfo.job_enabled
+	$job_created  = $LogreaderInfo.job_created
+	$job_modified = $LogreaderInfo.job_modified
+	
+	$obj = [PSCustomObject]@{
+		'publisher'         = $publisher
+		'publication'       = $publication
+		'publisher_db'      = $publisher_db
+		'publisher_security_mode' = $publisher_security_mode
+		'publisher_login'   = $publisher_login
+		'profile_name'      = $profile_name
+		'job_name'          = $job_name
+		'job_enabled'       = $job_enabled
+		'job_created'       = $job_created
+		'job_modified'      = $job_modified
+	}
+	$LogreaderTable.Add($obj)
+}
+
+if (($LogreaderTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No publication were found'
+	}
+	$LogreaderTable.Add($obj)
+}
+
+# Distribution Agent
+$DistributionTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DistributionInfos = ExecuteSQL "select s1.name as publisher,publisher_db,publication,s2.name as subscriber,subscriber_db,creation_date
+,(case when subscription_type=0 then 'Push' when subscription_type=1 then 'Pull' when subscription_type=2 then 'Anonymous' else ''end) subscription_type
+,profile_name,ss.name as job_name,sj.enabled as job_enabled,sj.date_created as job_created,sj.date_modified as job_modified
+from distribution.dbo.MSdistribution_agents ss
+inner join master.sys.servers s1 on ss.publisher_id=s1.server_id
+inner join master.sys.servers s2 on ss.subscriber_id=s2.server_id
+left join msdb.dbo.MSagent_profiles ap on ss.profile_id=ap.profile_id
+left join msdb.dbo.sysjobs sj on ss.job_id=sj.job_id"
+
+foreach ($DistributionInfo in $DistributionInfos)
+{
+	$publisher = $DistributionInfo.publisher
+	$publisher_db  = $DistributionInfo.publisher_db
+	$publication = $DistributionInfo.publication
+	$subscriber  = $DistributionInfo.subscriber
+	$subscriber_db = $DistributionInfo.subscriber_db
+	$creation_date  = $DistributionInfo.creation_date
+	$profile_name = $DistributionInfo.profile_name
+	$job_name = $DistributionInfo.job_name
+	$job_enabled = $DistributionInfo.job_enabled
+	$job_created  = $DistributionInfo.job_created
+	$job_modified = $DistributionInfo.job_modified
+	
+	$obj = [PSCustomObject]@{
+		'publisher'         = $publisher
+		'publisher_db'      = $publisher_db
+		'publication'       = $publication
+		'subscriber' = $subscriber
+		'subscriber_db'   = $subscriber_db
+		'creation_date'      = $creation_date
+		'profile_name'          = $profile_name
+		'job_name'          = $job_name
+		'job_enabled'       = $job_enabled
+		'job_created'       = $job_created
+		'job_modified'      = $job_modified
+	}
+	$DistributionTable.Add($obj)
+}
+
+if (($DistributionTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No publication were found'
+	}
+	$DistributionTable.Add($obj)
+}
+
+} # End check the current server is distributor or not
+
+<#
+# Check the current server is publisher or not
+$IsPublisher = ExecuteSQL "SELECT 1 as id FROM master.sys.databases 
+WHERE is_published = 1  AND user_access=0 and is_read_only=0 and state=0 AND HAS_DBACCESS(name)=1  AND source_database_id is null"
+
+# Check the current server is subscriber or not
+$IsSubscriber = ExecuteSQL "SELECT name INTO #db FROM sys.databases
+WHERE  user_access=0 and is_read_only=0 and state=0 AND HAS_DBACCESS(name)=1 AND source_database_id is null;
+SELECT 1 as id FROM #db WHERE OBJECT_ID(name+'.dbo.MSreplication_objects') IS NOT NULL;"
+#>
+
+
 
 <################################ AlwaysOn-AG ##################################>
 
@@ -876,15 +1119,18 @@ $MSSQLReport = New-Object 'System.Collections.Generic.List[System.Object]'
 $MSSQLReport.Add($(Get-HTMLOpenPage -TitleText $ReportTitle -LeftLogoString "" -RightLogoString $RightLogo ))
 $MSSQLReport.Add($(Get-HTMLTabHeader -TabNames $Options))
 
+
 <# Dashboard option #>
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[0] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
+
 $DatabaseWarnTable = $DatabaseInfoTable | Where-Object {($_.UserAccessDesc -ne "MULTI_USER") -or ($_.IsReadOnly -ne 0) -or ($_.StateDesc -ne "ONLINE")}
-if ( $DatabaseWarnTable.Count -gt 0)
+if ( @($DatabaseWarnTable).Count -gt 0)
 {
   $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "WARNING : Database" -BackgroundShade 2))
   $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $DatabaseWarnTable -Red '$this.DatabaseId -gt 0') -HideFooter))
   $MSSQLReport.Add($(Get-HTMLContentClose))
 }
+
 if ( $DiskWarnCnt -gt 0)
 {
   $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "WARNING : Disk Space less then 10% !" -BackgroundShade 2))
@@ -896,6 +1142,7 @@ if ( $DiskWarnCnt -gt 0)
   }
   $MSSQLReport.Add($(Get-HTMLContentClose))
 }
+
 $DisableLoginNameTable = $LoginNameTable | Where-Object {$_.IsDisabled -eq 1}
 if ( $DisableLoginNameTable.Count -gt 0)
 {
@@ -903,10 +1150,11 @@ if ( $DisableLoginNameTable.Count -gt 0)
   $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $DisableLoginNameTable -Yellow '$this.IsDisabled -eq 1') -HideFooter))
   $MSSQLReport.Add($(Get-HTMLContentClose))
 }
-$FailedJobsTable = $JobsHistoryTable | Where-Object { ($_.RunStatus -eq 0) -and ([datetime]::parseexact($_.RunDate, 'yyyyMMdd',[System.Globalization.CultureInfo]::DefaultThreadCurrentCulture) -gt (Get-date).AddDays(-1))}
+
+$FailedJobsTable = $JobsHistoryTable | Where-Object { ($_.RunStatus -eq 0) -and ([datetime]::parseexact($_.RunDate, 'yyyyMMdd',[System.Globalization.CultureInfo]::DefaultThreadCurrentCulture) -gt (Get-date).AddDays(-7))}
 if ( @($FailedJobsTable).Count -gt 0)
 {
-  $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "WARNING : Failed jobs in the last one day" -BackgroundShade 2))
+  $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "WARNING : Failed jobs in the last seven days" -BackgroundShade 2))
   $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $FailedJobsTable -Red '$this.RunStatus -eq 0') -HideFooter))
   $MSSQLReport.Add($(Get-HTMLContentClose))
 }
@@ -915,8 +1163,17 @@ $MSSQLReport.Add($(Get-HTMLTabContentClose))
 
 <# BaseInfo option #>
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[1] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "OS Information"))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "OS Product & SQL Server Product"))
+$MSSQLReport.Add($(Get-HTMLColumn1of2))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "OS Product"))
 $MSSQLReport.Add($(Get-HTMLContentTable $OSInfoTable -HideFooter))
+$MSSQLReport.Add($(Get-HTMLContentClose))
+$MSSQLReport.Add($(Get-HTMLColumnClose))
+$MSSQLReport.Add($(Get-HTMLColumn2of2))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "SQL Server Product"))
+$MSSQLReport.Add($(Get-HTMLContentTable $SQLVersionTable -HideFooter))
+$MSSQLReport.Add($(Get-HTMLContentClose))
+$MSSQLReport.Add($(Get-HTMLColumnClose))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Logical Disk Space"))
 foreach ($i in 0..($DiskCnt-1))
@@ -937,6 +1194,9 @@ $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "SQL Server Service Status"))
 $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $SQLServiceTable -Yellow '$this.Status -eq "Stopped"') -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLColumnClose))
+$MSSQLReport.Add($(Get-HTMLContentClose))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Windows Scheduled Tasks"))
+$MSSQLReport.Add($(Get-HTMLContentDataTable $OSTaskTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "SQL Server Configurations"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $SQLConfTable -HideFooter))
@@ -987,7 +1247,7 @@ $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[3] -TabHeading ("Rep
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Jobs Base Information"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $JobsInfoTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Jobs History Information"))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Jobs History"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $JobsHistoryTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLTabContentClose))
@@ -997,7 +1257,7 @@ $MSSQLReport.Add($(Get-HTMLTabContentClose))
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[4] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Database Backup"))
 $MSSQLReport.Add($(Get-HTMLColumn1of2))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "The Last Backup"))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "The Latest Backup"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $BackupInfoTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLColumnClose))
@@ -1006,10 +1266,10 @@ $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Backup Information"))
 $MSSQLReport.Add($(Get-HTMLPieChart -ChartObject $PieBackupLinks -DataSet $BackupInfoPie))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLColumnClose))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Backup History Information"))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Backup History"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable ($BackupDetailTable | Sort LatestBackupTime -Descending) -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Restore History Information"))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Restore History"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable ($RestoreTable | Sort RestoreDate -Descending) -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLContentClose))
@@ -1021,7 +1281,24 @@ $MSSQLReport.Add($(Get-HTMLTabContentClose))
 
 <# Replication option #>
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[6] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
+# Check the current server is distributor or not
+if ( @($IsDistributor).Count -gt 0 )
+{
+  $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Publisher DB & Subscriber DB"))
+  $MSSQLReport.Add($(Get-HTMLContentDataTable $PSTable -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentClose))
+  $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Snapshot Agents"))
+  $MSSQLReport.Add($(Get-HTMLContentDataTable $SnapshotTable -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentClose))
+  $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Logreader Agents"))
+  $MSSQLReport.Add($(Get-HTMLContentDataTable $LogreaderTable -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentClose))
+  $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Distribution Agents"))
+  $MSSQLReport.Add($(Get-HTMLContentDataTable $DistributionTable -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentClose))
+}
 $MSSQLReport.Add($(Get-HTMLTabContentClose))
+
 
 <# AlwaysOn-AG option #>
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[7] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
