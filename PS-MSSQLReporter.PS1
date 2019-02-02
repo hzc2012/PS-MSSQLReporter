@@ -8,7 +8,7 @@ Import-Module ReportHTML -ErrorAction SilentlyContinue
 
 
 $ReportTitle = "SQL Server Report"
-$ReportSavePath = "C:\Users\"
+$ReportSavePath = "D:\"
 $ReportName = ($(get-date -format "yyyyMMdd")+"MSSQL_Report")
 $RightLogo="https://raw.githubusercontent.com/hzc2012/PS-MSSQLReporter/master/example/PS-MSSQLReporter.png"
 
@@ -113,8 +113,8 @@ $OSInfoTable.Add([PSCustomObject]@{'Name' = "System Type";'Value' = $Win1.System
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "OS Architecture";'Value' = $Win2.OSArchitecture})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Number Of Processors";'Value' = $Win1.NumberOfProcessors})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Number Of Logical Processors";'Value' = $Win1.NumberOfLogicalProcessors})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Virtual Memory Size";'Value' = ConvertSize($Win2.TotalVirtualMemorySize * 1024)})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Physical Memory Size";'Value' = ConvertSize($Win2.TotalVisibleMemorySize * 1024)})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Virtual Memory";'Value' = ConvertSize($Win2.TotalVirtualMemorySize * 1024)})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Physical Memory";'Value' = ConvertSize($Win2.TotalVisibleMemorySize * 1024)})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Free Virtual Memory";'Value' = ConvertSize($Win2.FreeVirtualMemory * 1024)})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Free Physical Memory";'Value' = ConvertSize($Win2.FreePhysicalMemory * 1024)})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Last BootUp Time";'Value' = $Win2.LastBootUpTime})
@@ -204,14 +204,32 @@ $SQLVersions = ExecuteSQL "EXEC master.dbo.xp_msver"
 
 foreach ($SQLVersion in $SQLVersions)
 {
-	$Index = $SQLVersion.Index
+#	$Index = $SQLVersion.Index
 	$Name = $SQLVersion.Name
 	$Character_Value = $SQLVersion.Character_Value
 	
+	if ( !([string]::IsNullOrWhiteSpace($Character_Value)))
+	{
+	  $obj = [PSCustomObject]@{
+		  'Name'           = $Name
+	  	  'Value' = $Character_Value
+	  }
+	  $SQLVersionTable.Add($obj)
+	}	
+}
+
+$SQLVersion2s = ExecuteSQL "select 'InstanceName' AS Name,SERVERPROPERTY('ServerName') as Value union all 
+select 'Edition' AS Name,SERVERPROPERTY('Edition')union all select 'ServicePack' AS Name,SERVERPROPERTY('Productlevel')union all 
+select 'Version' AS Name,SERVERPROPERTY('ProductVersion')union all select 'IsCluster' AS Name,SERVERPROPERTY('IsClustered')"
+
+foreach ($SQLVersion2 in $SQLVersion2s)
+{
+	$Name = $SQLVersion2.Name
+	$Value = $SQLVersion2.Value
+	
 	$obj = [PSCustomObject]@{
-		'Index'          = $Index
-		'Name'           = $Name
-		'CharacterValue' = $Character_Value
+		'Name'  = $Name
+	  	'Value' = $Value
 	}
 	$SQLVersionTable.Add($obj)
 }
@@ -682,8 +700,8 @@ $BackupInfoPie.Add($obj2)
 
 $PieBackupLinks = Get-HTMLPieChartObject
 $PieBackupLinks.Title = "Database Backup"
-$PieBackupLinks.Size.Height = 300
-$PieBackupLinks.Size.width = 300
+$PieBackupLinks.Size.Height = 400
+$PieBackupLinks.Size.width = 400
 $PieBackupLinks.ChartStyle.ChartType = 'doughnut'
 $PieBackupLinks.ChartStyle.ColorSchemeName = "ColorScheme4"
 $PieBackupLinks.ChartStyle.ColorSchemeName = "Generated5"
@@ -714,12 +732,12 @@ foreach ($BackupDetailInfo in $BackupDetailInfos)
 	$backup_path  = $BackupDetailInfo.backup_path
 	
 	$obj = [PSCustomObject]@{
-		'DatabaseName'          = $database_name
-		'BackupType'            = $type
-		'LatestBackupTime'      = $latest_backup_time
-		'BackupSize'            = ConvertSize($backup_size)
-		'BackupTimeCost_Minute' = $backup_time_Min
-		'BackupPath'            = $backup_path
+		'DatabaseName' = $database_name
+		'BackupType'   = $type
+		'LatestTime'   = $latest_backup_time
+		'Size'         = ConvertSize($backup_size)
+		'TimeCost_Min' = $backup_time_Min
+		'BackupPath'   = $backup_path
 	}
 	$BackupDetailTable.Add($obj)
 }
@@ -977,6 +995,81 @@ if (($DistributionTable).Count -eq 0)
 	$DistributionTable.Add($obj)
 }
 
+# The latest replication Agent
+$AllAgentTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$AllAgents = ExecuteSQL "select 'Snapshot Agent'as agent_name,a.name as logreader_agent
+,(case when runstatus=1 then 'Start' when runstatus=2 then 'Succeed' when runstatus=3 then 'In progress'
+ when runstatus=4 then 'Idle' when runstatus=5 then 'Retry' when runstatus=6 then 'Fail' end) as runstatus
+,b.time,b.start_time,b.duration,j.enabled as job_enabled
+,delivered_transactions,delivered_commands,null as average_commands,delivery_rate,null as delivery_latency
+from distribution.dbo.MSsnapshot_agents a with(readpast)
+inner join distribution.dbo.MSsnapshot_history b with(readpast) on a.id=b.agent_id
+inner join (select agent_id,max(time) as time from distribution.dbo.MSsnapshot_history with(readpast) group by agent_id) h
+on b.agent_id=h.agent_id and b.time=h.time
+left join msdb.dbo.sysjobs j with(readpast) on a.job_id=j.job_id
+union all
+select 'Logreader Agent'as agent_name,a.name as logreader_agent
+,(case when runstatus=1 then 'Start' when runstatus=2 then 'Succeed' when runstatus=3 then 'In progress'
+ when runstatus=4 then 'Idle' when runstatus=5 then 'Retry' when runstatus=6 then 'Fail' end) as runstatus
+,b.time,b.start_time,b.duration,j.enabled as job_enabled
+,delivered_transactions,delivered_commands,average_commands,delivery_rate,delivery_latency
+from distribution.dbo.MSlogreader_agents a with(readpast)
+inner join distribution.dbo.MSlogreader_history b with(readpast) on a.id=b.agent_id
+inner join (select agent_id,max(time) as time from distribution.dbo.MSlogreader_history with(readpast) group by agent_id) h
+on b.agent_id=h.agent_id and b.time=h.time
+left join msdb.dbo.sysjobs j with(readpast) on a.job_id=j.job_id
+union all --dist to sub
+select 'Distribution Agent'as agent_name,a.name as logreader_agent
+,(case when runstatus=1 then 'Start' when runstatus=2 then 'Succeed' when runstatus=3 then 'In progress'
+ when runstatus=4 then 'Idle' when runstatus=5 then 'Retry' when runstatus=6 then 'Fail' end) as runstatus
+,b.time,b.start_time,b.duration,j.enabled as job_enabled
+,delivered_transactions,delivered_commands,average_commands,delivery_rate,delivery_latency
+from distribution.dbo.MSdistribution_agents a with(readpast)
+inner join distribution.dbo.MSdistribution_history b with(readpast) on a.id=b.agent_id
+inner join (select agent_id,max(time) as time from distribution.dbo.MSdistribution_history with(readpast) group by agent_id) h
+on b.agent_id=h.agent_id and b.time=h.time
+left join msdb.dbo.sysjobs j with(readpast) on a.job_id=j.job_id"
+
+foreach ($AllAgent in $AllAgents)
+{
+	$agent_name = $AllAgent.agent_name
+	$logreader_agent  = $AllAgent.logreader_agent
+	$runstatus = $AllAgent.runstatus
+	$time  = $AllAgent.time
+	$start_time = $AllAgent.start_time
+	$duration  = $AllAgent.duration
+	$job_enabled = $AllAgent.job_enabled
+	$delivered_transactions = $AllAgent.delivered_transactions
+	$delivered_commands = $AllAgent.delivered_commands
+	$average_commands  = $AllAgent.average_commands
+	$delivery_rate = $AllAgent.delivery_rate
+	$delivery_latency = $AllAgent.delivery_latency
+	
+	$obj = [PSCustomObject]@{
+		'agent_name'      = $agent_name
+		'logreader_agent' = $logreader_agent
+		'runstatus'       = $runstatus
+		'time'            = $time
+		'start_time'      = $start_time
+		'duration'        = $duration
+		'job_enabled'     = $job_enabled
+		'delivered_transactions' = $delivered_transactions
+		'delivered_commands'     = $delivered_commands
+		'average_commands'       = $average_commands
+		'delivery_rate'          = $delivery_rate
+		'delivery_latency'       = $delivery_latency
+	}
+	$AllAgentTable.Add($obj)
+}
+
+if (($AllAgentTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No publication were found'
+	}
+	$AllAgentTable.Add($obj)
+}
+
 } # End check the current server is distributor or not
 
 <#
@@ -1127,7 +1220,7 @@ $DatabaseWarnTable = $DatabaseInfoTable | Where-Object {($_.UserAccessDesc -ne "
 if ( @($DatabaseWarnTable).Count -gt 0)
 {
   $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "WARNING : Database" -BackgroundShade 2))
-  $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $DatabaseWarnTable -Red '$this.DatabaseId -gt 0') -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $DatabaseWarnTable -Red "1 -eq 1") -HideFooter))
   $MSSQLReport.Add($(Get-HTMLContentClose))
 }
 
@@ -1147,7 +1240,7 @@ $DisableLoginNameTable = $LoginNameTable | Where-Object {$_.IsDisabled -eq 1}
 if ( $DisableLoginNameTable.Count -gt 0)
 {
   $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "WARNING : Login Name were disabled" -BackgroundShade 2))
-  $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $DisableLoginNameTable -Yellow '$this.IsDisabled -eq 1') -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $DisableLoginNameTable -Yellow "1 -eq 1") -HideFooter))
   $MSSQLReport.Add($(Get-HTMLContentClose))
 }
 
@@ -1155,7 +1248,14 @@ $FailedJobsTable = $JobsHistoryTable | Where-Object { ($_.RunStatus -eq 0) -and 
 if ( @($FailedJobsTable).Count -gt 0)
 {
   $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "WARNING : Failed jobs in the last seven days" -BackgroundShade 2))
-  $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $FailedJobsTable -Red '$this.RunStatus -eq 0') -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $FailedJobsTable -Red "1 -eq 1") -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentClose))
+}
+$FailedAgentTable = $AllAgentTable | Where-Object { ($_.runstatus -eq "Retry") -or ($_.runstatus -eq "Fail") }
+if ( @($FailedAgentTable).Count -gt 0)
+{
+  $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "WARNING : Failed replication agents" -BackgroundShade 2))
+  $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $FailedAgentTable -Red "1 -eq 1" ) -HideFooter))
   $MSSQLReport.Add($(Get-HTMLContentClose))
 }
 $MSSQLReport.Add($(Get-HTMLTabContentClose))
@@ -1295,6 +1395,9 @@ if ( @($IsDistributor).Count -gt 0 )
   $MSSQLReport.Add($(Get-HTMLContentClose))
   $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Distribution Agents"))
   $MSSQLReport.Add($(Get-HTMLContentDataTable $DistributionTable -HideFooter))
+  $MSSQLReport.Add($(Get-HTMLContentClose))
+  $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Agents Status"))
+  $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $AllAgentTable -Red '($this.runstatus -eq "Retry") -or ($this.runstatus -eq "Fail")') -HideFooter))
   $MSSQLReport.Add($(Get-HTMLContentClose))
 }
 $MSSQLReport.Add($(Get-HTMLTabContentClose))
