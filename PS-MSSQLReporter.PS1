@@ -114,8 +114,8 @@ $OSInfoTable.Add([PSCustomObject]@{'Name' = "OS Architecture";'Value' = $Win2.OS
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Number Of Processors";'Value' = $Win1.NumberOfProcessors})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Number Of Logical Processors";'Value' = $Win1.NumberOfLogicalProcessors})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Virtual Memory";'Value' = ConvertSize($Win2.TotalVirtualMemorySize * 1024)})
-$OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Physical Memory";'Value' = ConvertSize($Win2.TotalVisibleMemorySize * 1024)})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Free Virtual Memory";'Value' = ConvertSize($Win2.FreeVirtualMemory * 1024)})
+$OSInfoTable.Add([PSCustomObject]@{'Name' = "Total Physical Memory";'Value' = ConvertSize($Win2.TotalVisibleMemorySize * 1024)})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Free Physical Memory";'Value' = ConvertSize($Win2.FreePhysicalMemory * 1024)})
 $OSInfoTable.Add([PSCustomObject]@{'Name' = "Last BootUp Time";'Value' = $Win2.LastBootUpTime})
 
@@ -297,8 +297,6 @@ if (($OSTaskTable).Count -eq 0)
 }
 
 
-
-
 # SQL Server Configurations
 $SQLConfTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $SQLConfs = ExecuteSQL "SELECT configuration_id,name,value,minimum,maximum,value_in_use,description,is_dynamic,is_advanced FROM master.sys.configurations"
@@ -338,11 +336,58 @@ if (($SQLConfTable).Count -eq 0)
 }
 
 
+# Connection Servers
+$ConnServerTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ConnServers = ExecuteSQL "select name,product,provider,data_source,is_linked,is_system,is_publisher,is_distributor
+,is_subscriber,is_rpc_out_enabled,is_data_access_enabled,is_remote_login_enabled from master.sys.servers"
+
+foreach ($ConnServer in $ConnServers)
+{
+	$name = $ConnServer.name
+	$product = $ConnServer.product
+	$provider = $ConnServer.provider
+	$data_source = $ConnServer.data_source
+	$is_linked = $ConnServer.is_linked
+	$is_system = $ConnServer.is_system
+	$is_publisher = $ConnServer.is_publisher
+	$is_distributor = $ConnServer.is_distributor
+	$is_subscriber = $ConnServer.is_subscriber
+	$is_rpc_out_enabled = $ConnServer.is_rpc_out_enabled
+	$is_data_access_enabled = $ConnServer.is_data_access_enabled
+	$is_remote_login_enabled = $ConnServer.is_remote_login_enabled
+	
+	$obj = [PSCustomObject]@{
+		'name'           = $name
+		'product'        = $product
+		'provider'       = $provider
+		'data_source'    = $data_source
+		'is_linked'      = $is_linked
+		'is_system'      = $is_system
+		'is_publisher'   = $is_publisher
+		'is_distributor' = $is_distributor
+		'is_subscriber'  = $is_subscriber
+		'is_rpc_out_enabled'      = $is_rpc_out_enabled
+		'is_data_access_enabled'  = $is_data_access_enabled
+		'is_remote_login_enabled' = $is_remote_login_enabled
+	}
+	$ConnServerTable.Add($obj)
+}
+
+if (($ConnServerTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No server were found'
+	}
+	$ConnServerTable.Add($obj)
+}
 
 
 
 
-<################################ Database ##################################>
+
+
+
+<################################ Instance ##################################>
 # database information
 $DatabaseInfoTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $DatabaseInfos = ExecuteSQL "select database_id,name,compatibility_level,collation_name,user_access_desc,is_read_only
@@ -821,8 +866,8 @@ inner join master.sys.servers s2 on s.subscriber_id=s2.server_id"
 
 foreach ($PSInfo in $PSInfos)
 {
-	$publisher = $PSInfo.publisher
 	$publication = $PSInfo.publication
+	$publisher = $PSInfo.publisher
 	$publisher_db  = $PSInfo.publisher_db
 	$subscriber = $PSInfo.subscriber
 	$subscriber_db  = $PSInfo.subscriber_db
@@ -831,8 +876,8 @@ foreach ($PSInfo in $PSInfos)
 	$status = $PSInfo.status
 	
 	$obj = [PSCustomObject]@{
-		'publisher'         = $publisher
 		'publication'       = $publication
+		'publisher'         = $publisher
 		'publisher_db'      = $publisher_db
 		'subscriber'        = $subscriber
 		'subscriber_db'     = $subscriber_db
@@ -864,8 +909,8 @@ left join msdb.dbo.sysjobs sj on ss.job_id=sj.job_id"
 
 foreach ($SnapshotInfo in $SnapshotInfos)
 {
-	$publisher = $SnapshotInfo.publisher
 	$publication = $SnapshotInfo.publication
+	$publisher = $SnapshotInfo.publisher
 	$publisher_db  = $SnapshotInfo.publisher_db
 	$publication_type = $SnapshotInfo.publication_type
 	$publisher_security_mode  = $SnapshotInfo.publisher_security_mode
@@ -912,8 +957,8 @@ left join msdb.dbo.sysjobs sj on ss.job_id=sj.job_id"
 
 foreach ($LogreaderInfo in $LogreaderInfos)
 {
-	$publisher = $LogreaderInfo.publisher
 	$publication = $LogreaderInfo.publication
+	$publisher = $LogreaderInfo.publisher
 	$publisher_db  = $LogreaderInfo.publisher_db
 	$publisher_security_mode  = $LogreaderInfo.publisher_security_mode
 	$publisher_login = $LogreaderInfo.publisher_login
@@ -924,8 +969,8 @@ foreach ($LogreaderInfo in $LogreaderInfos)
 	$job_modified = $LogreaderInfo.job_modified
 	
 	$obj = [PSCustomObject]@{
-		'publisher'         = $publisher
 		'publication'       = $publication
+		'publisher'         = $publisher
 		'publisher_db'      = $publisher_db
 		'publisher_security_mode' = $publisher_security_mode
 		'publisher_login'   = $publisher_login
@@ -959,9 +1004,9 @@ left join msdb.dbo.sysjobs sj on ss.job_id=sj.job_id"
 
 foreach ($DistributionInfo in $DistributionInfos)
 {
+	$publication = $DistributionInfo.publication
 	$publisher = $DistributionInfo.publisher
 	$publisher_db  = $DistributionInfo.publisher_db
-	$publication = $DistributionInfo.publication
 	$subscriber  = $DistributionInfo.subscriber
 	$subscriber_db = $DistributionInfo.subscriber_db
 	$creation_date  = $DistributionInfo.creation_date
@@ -972,9 +1017,9 @@ foreach ($DistributionInfo in $DistributionInfos)
 	$job_modified = $DistributionInfo.job_modified
 	
 	$obj = [PSCustomObject]@{
+		'publication'       = $publication
 		'publisher'         = $publisher
 		'publisher_db'      = $publisher_db
-		'publication'       = $publication
 		'subscriber' = $subscriber
 		'subscriber_db'   = $subscriber_db
 		'creation_date'      = $creation_date
@@ -1207,7 +1252,7 @@ if (($CatchObjectTypeTable).Count -eq 0)
 <#####################################################################################>
 Write-Host "Compiling Report..." -ForegroundColor Green
 
-$Options = @('Dashboard','BaseInfo','Database','Jobs','Backup&Restore','Mirror','Replication','AlwaysOn-AG','AlwaysOn-FCI','Perfmon')
+$Options = @('Dashboard','BaseInfo','Instance','Jobs','Backup&Restore','Mirror','Replication','AlwaysOn-AG','AlwaysOn-FCI','Perfmon')
 $MSSQLReport = New-Object 'System.Collections.Generic.List[System.Object]'
 $MSSQLReport.Add($(Get-HTMLOpenPage -TitleText $ReportTitle -LeftLogoString "" -RightLogoString $RightLogo ))
 $MSSQLReport.Add($(Get-HTMLTabHeader -TabNames $Options))
@@ -1283,9 +1328,9 @@ foreach ($i in 0..($DiskCnt-1))
   $MSSQLReport.Add($(Get-HTMLColumnClose))
 }
 $MSSQLReport.Add($(Get-HTMLContentClose))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "SQL Server Version"))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Status"))
 $MSSQLReport.Add($(Get-HTMLColumn1of2))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "SQL Server Product Version"))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Cluster Status"))
 $MSSQLReport.Add($(Get-HTMLContentTable $SQLVersionTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLColumnClose))
@@ -1298,13 +1343,10 @@ $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Windows Scheduled Tasks"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $OSTaskTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "SQL Server Configurations"))
-$MSSQLReport.Add($(Get-HTMLContentDataTable $SQLConfTable -HideFooter))
-$MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLTabContentClose))
 
 
-<# Database option #>
+<# Instance option #>
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[2] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Database Information"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $DatabaseInfoTable -HideFooter))
@@ -1335,6 +1377,12 @@ $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Agent Error Log Size"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $AgentErrorLogTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLColumnClose))
+$MSSQLReport.Add($(Get-HTMLContentClose))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Connection Servers"))
+$MSSQLReport.Add($(Get-HTMLContentDataTable $ConnServerTable -HideFooter))
+$MSSQLReport.Add($(Get-HTMLContentClose))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "SQL Server Configurations"))
+$MSSQLReport.Add($(Get-HTMLContentDataTable $SQLConfTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Login Name"))
 $MSSQLReport.Add($(Get-HTMLContentTable $(Set-TableRowColor $LoginNameTable -Yellow '$this.IsDisabled -eq 1') -HideFooter))
@@ -1411,9 +1459,9 @@ $MSSQLReport.Add($(Get-HTMLTabContentClose))
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[8] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
 $MSSQLReport.Add($(Get-HTMLTabContentClose))
 
-<# Perfmon option #>
+<# Perfmon option -IsHidden #>
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[9] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Buffer allocation" -IsHidden ))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Buffer allocation" ))
 $MSSQLReport.Add($(Get-HTMLColumn1of2))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Database buffer pool allocation"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $DBBufferpoolTable -HideFooter))
@@ -1425,7 +1473,7 @@ $MSSQLReport.Add($(Get-HTMLContentDataTable $DBDirtyPageTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLColumnClose))
 $MSSQLReport.Add($(Get-HTMLContentClose))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Cached Type Usage" -IsHidden ))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Cached Type Usage" ))
 $MSSQLReport.Add($(Get-HTMLColumn1of2))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Cached Type Size"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $CatchTypeTable -HideFooter))
