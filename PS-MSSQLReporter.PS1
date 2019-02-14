@@ -4,12 +4,13 @@ param (
 	[String]$Password = $null
 )
 
+# Install-Module -Name ReportHTML
 Import-Module ReportHTML -ErrorAction SilentlyContinue
 
 
 $ReportTitle = "SQL Server Report"
 $ReportSavePath = "D:\"
-$ReportName = ($(get-date -format "yyyyMMdd")+"MSSQL_Report")
+$ReportName = ($(get-date -format "yyyyMMdd")+"_$(hostname)_MSSQLReport")
 $RightLogo="https://raw.githubusercontent.com/hzc2012/PS-MSSQLReporter/master/example/PS-MSSQLReporter.png"
 
 (Write-Host -NoNewline "`nInstance: " -ForegroundColor Yellow), (Write-Host $Instance -ForegroundColor White)
@@ -366,9 +367,9 @@ foreach ($ConnServer in $ConnServers)
 		'is_publisher'   = $is_publisher
 		'is_distributor' = $is_distributor
 		'is_subscriber'  = $is_subscriber
-		'is_rpc_out_enabled'      = $is_rpc_out_enabled
-		'is_data_access_enabled'  = $is_data_access_enabled
-		'is_remote_login_enabled' = $is_remote_login_enabled
+		'rpc_out_enabled'      = $is_rpc_out_enabled
+		'data_access_enabled'  = $is_data_access_enabled
+		'remote_login_enabled' = $is_remote_login_enabled
 	}
 	$ConnServerTable.Add($obj)
 }
@@ -380,11 +381,6 @@ if (($ConnServerTable).Count -eq 0)
 	}
 	$ConnServerTable.Add($obj)
 }
-
-
-
-
-
 
 
 <################################ Instance ##################################>
@@ -841,9 +837,110 @@ if (($RestoreTable).Count -eq 0)
 
 
 
-
-
 <################################ Mirror ##################################>
+# Endpoint & Certificate
+$EPCetsTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$EPCetInfos = ExecuteSQL "select a.name,protocol_desc,type_desc,state_desc,role_desc,is_encryption_enabled,encryption_algorithm
+,b.name as certificate,b.pvt_key_encryption_type_desc,is_active_for_begin_dialog,start_date,expiry_date,subject
+from sys.database_mirroring_endpoints a left join sys.certificates b on a.certificate_id=b.certificate_id"
+
+foreach ($EPCetInfo in $EPCetInfos)
+{
+	$name = $EPCetInfo.name
+	$protocol_desc = $EPCetInfo.protocol_desc
+	$type_desc  = $EPCetInfo.type_desc
+	$state_desc = $EPCetInfo.state_desc
+	$role_desc  = $EPCetInfo.role_desc
+	$is_encryption_enabled = $EPCetInfo.is_encryption_enabled
+	$encryption_algorithm  = $EPCetInfo.encryption_algorithm
+	$certificate = $EPCetInfo.certificate
+	$pvt_key_encryption_type_desc  = $EPCetInfo.pvt_key_encryption_type_desc
+	$is_active_for_begin_dialog  = $EPCetInfo.is_active_for_begin_dialog
+	$start_date = $EPCetInfo.start_date
+	$expiry_date  = $EPCetInfo.expiry_date
+	$subject  = $EPCetInfo.subject
+	
+	$obj = [PSCustomObject]@{
+		'name'           = $name
+		'protocol_desc'  = $protocol_desc
+		'type_desc'      = $type_desc
+		'state_desc'     = $state_desc
+		'role_desc'      = $role_desc
+		'is_encryption_enabled' = $is_encryption_enabled
+		'encryption_algorithm'  = $encryption_algorithm
+		'certificate'           = $certificate
+		'pvt_key_encryption_type_desc' = $pvt_key_encryption_type_desc
+		'is_active_for_begin_dialog'   = $is_active_for_begin_dialog
+		'start_date'     = $start_date
+		'expiry_date'    = $expiry_date
+		'subject'        = $subject	
+	}
+	$EPCetsTable.Add($obj)
+}
+
+if (($EPCetsTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No mirror were found'
+	}
+	$EPCetsTable.Add($obj)
+}
+
+
+# Mirroring Information
+$MirroringTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$MirroringInfos = ExecuteSQL "select b.name as database_name,mirroring_state_desc,mirroring_role_desc,mirroring_safety_level_desc
+,mirroring_partner_name,mirroring_partner_instance,mirroring_witness_name,mirroring_witness_state_desc
+,mirroring_connection_timeout,mirroring_redo_queue_type,mirroring_end_of_log_lsn,mirroring_replication_lsn,mirroring_failover_lsn
+from sys.database_mirroring a left join sys.databases b on a.database_id=b.database_id where mirroring_guid is not null"
+
+foreach ($MirroringInfo in $MirroringInfos)
+{
+	$database_name = $MirroringInfo.database_name
+	$mirroring_state_desc = $MirroringInfo.mirroring_state_desc
+	$mirroring_role_desc  = $MirroringInfo.mirroring_role_desc
+	$mirroring_safety_level_desc = $MirroringInfo.mirroring_safety_level_desc
+	$mirroring_partner_name  = $MirroringInfo.mirroring_partner_name
+	$mirroring_partner_instance = $MirroringInfo.mirroring_partner_instance
+	$mirroring_witness_name  = $MirroringInfo.mirroring_witness_name
+	$mirroring_witness_state_desc = $MirroringInfo.mirroring_witness_state_desc
+	$mirroring_connection_timeout  = $MirroringInfo.mirroring_connection_timeout
+	$mirroring_redo_queue_type  = $MirroringInfo.mirroring_redo_queue_type
+	$mirroring_end_of_log_lsn = $MirroringInfo.mirroring_end_of_log_lsn
+	$mirroring_replication_lsn  = $MirroringInfo.mirroring_replication_lsn
+	$mirroring_failover_lsn  = $MirroringInfo.mirroring_failover_lsn
+	
+	$obj = [PSCustomObject]@{
+		'database_name'      = $database_name
+		'state_desc'         = $mirroring_state_desc
+		'role_desc'          = $mirroring_role_desc
+		'safety_level_desc'  = $mirroring_safety_level_desc
+		'partner_name'       = $mirroring_partner_name
+		'partner_instance'   = $mirroring_partner_instance
+		'witness_name'       = $mirroring_witness_name
+		'witness_state_desc' = $mirroring_witness_state_desc
+		'connection_timeout' = $mirroring_connection_timeout
+		'redo_queue_type'    = $mirroring_redo_queue_type
+		'end_of_log_lsn'     = $mirroring_end_of_log_lsn
+		'replication_lsn'    = $mirroring_replication_lsn
+		'failover_lsn'       = $mirroring_failover_lsn	
+	}
+	$MirroringTable.Add($obj)
+}
+
+if (($MirroringTable).Count -eq 0)
+{
+	$Obj = [PSCustomObject]@{
+		Information = 'Information: No mirror were found'
+	}
+	$MirroringTable.Add($obj)
+}
+
+
+
+
+
+
 
 <################################ Replication ##################################>
 # Check the current server is distributor or not
@@ -1378,7 +1475,7 @@ $MSSQLReport.Add($(Get-HTMLContentDataTable $AgentErrorLogTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLColumnClose))
 $MSSQLReport.Add($(Get-HTMLContentClose))
-$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Connection Servers"))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Linked Servers"))
 $MSSQLReport.Add($(Get-HTMLContentDataTable $ConnServerTable -HideFooter))
 $MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "SQL Server Configurations"))
@@ -1425,7 +1522,14 @@ $MSSQLReport.Add($(Get-HTMLTabContentClose))
 
 <# Mirror option #>
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[5] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Endpoint & Certificate"))
+$MSSQLReport.Add($(Get-HTMLContentDataTable $EPCetsTable -HideFooter))
+$MSSQLReport.Add($(Get-HTMLContentClose))
+$MSSQLReport.Add($(Get-HTMLContentOpen -HeaderText "Mirroring Information"))
+$MSSQLReport.Add($(Get-HTMLContentDataTable $MirroringTable -HideFooter))
+$MSSQLReport.Add($(Get-HTMLContentClose))
 $MSSQLReport.Add($(Get-HTMLTabContentClose))
+
 
 <# Replication option #>
 $MSSQLReport.Add($(Get-HTMLTabContentopen -TabName $Options[6] -TabHeading ("Report: " + (Get-Date -Format yyyy-MM-dd))))
