@@ -17,7 +17,7 @@ Install-Module -Name ReportHTML
 More reference ：[ReportHTML 1.3.0.7, Cmdlets Usage, Help & Examples](https://azurefieldnotesblog.blob.core.windows.net/wp-content/2017/02/Help-ReportHTML1.html)  
 
 ##### Esample :  
-HTML Page ：[HTML Page](https://hzc2012.github.io/PS-MSSQLReporter/)  
+HTML Page ：[HTML Page](http://htmlpreview.github.io/?https://github.com/hzc2012/PS-MSSQLReporter/blob/master/example/20190201MSSQL_Report.html)  
 
 
 ## Report Features  
