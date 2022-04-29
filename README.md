@@ -20,6 +20,11 @@ More reference ：[ReportHTML 1.3.0.7, Cmdlets Usage, Help & Examples](https://a
 HTML Page ：[HTML Page](http://htmlpreview.github.io/?https://github.com/hzc2012/PS-MSSQLReporter/blob/master/example/20190201MSSQL_Report.html)  
 
 
+### Functions
+![](https://raw.githubusercontent.com/hzc2012/PS-MSSQLReporter/master/example/functions.png)
+
+
+
 ## Report Features  
 
 ### Dashboard   
