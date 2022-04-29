@@ -23,6 +23,8 @@ HTML Page ：[HTML Page](http://htmlpreview.github.io/?https://github.com/hzc201
 ### Functions
 ![](https://raw.githubusercontent.com/hzc2012/PS-MSSQLReporter/master/example/functions.png)
 
+### Login
+![](https://raw.githubusercontent.com/hzc2012/PS-MSSQLReporter/master/example/login.png)
 
 
 ## Report Features  
