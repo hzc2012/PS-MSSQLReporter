@@ -55,8 +55,3 @@ HTML Page ：[HTML Page](http://htmlpreview.github.io/?https://github.com/hzc201
 
 
 
-### These options like Mirror/Replication/AlwaysOn-AG/AlwaysOn-FCI/Perfmon are not completed.  
-
-
-
-
